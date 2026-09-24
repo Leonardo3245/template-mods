@@ -1,117 +1,52 @@
-{%- if comments -%}
-/**
- * Include the Geode headers.
- */
-{% endif -%}
 #include <Geode/Geode.hpp>
-{% if comments %}
-/**
- * Brings cocos2d and all Geode namespaces to the current scope.
- */
-{%- endif %}
+#include <Geode/modify/LevelInfoLayer.hpp>
+#include <Geode/ui/BasedButtonSprite.hpp>
+
 using namespace geode::prelude;
-{% if comments %}
-/**
- * `$modify` lets you extend and modify GD's classes.
- * To hook a function in Geode, simply $modify the class
- * and write a new function definition with the signature of
- * the function you want to hook.
- *
- * Here we use the overloaded `$modify` macro to set our own class name,
- * so that we can use it for button callbacks.
- *
- * Notice the header being included, you *must* include the header for
- * the class you are modifying, or you will get a compile error.
- *
- * Another way you could do this is like this:
- *
- * struct MyMenuLayer : Modify<MyMenuLayer, MenuLayer> {};
- */
-{%- endif %}
-#include <Geode/modify/MenuLayer.hpp>
-class $modify(MyMenuLayer, MenuLayer) {
-{%- if comments %}
-	/**
-	 * Typically classes in GD are initialized using the `init` function, (though not always!),
-	 * so here we use it to add our own button to the bottom menu.
-	 *
-	 * Note that for all hooks, your signature has to *match exactly*,
-	 * `void init()` would not place a hook!
-	*/
-{%- endif %}
-	bool init() {
-{%- if comments %}
-		/**
-		 * We call the original init function so that the
-		 * original class is properly initialized.
-		 */
-{%- endif %}
-		if (!MenuLayer::init()) {
-			return false;
-		}
-{% if comments %}
-		/**
-		 * You can use methods from the `geode::log` namespace to log messages to the console,
-		 * being useful for debugging and such. See this page for more info about logging:
-		 * https://docs.geode-sdk.org/tutorials/logging
-		*/
-{%- endif %}
-		log::debug("Hello from my MenuLayer::init hook! This layer has {} children.", this->getChildrenCount());
-{% if comments %}
-		/**
-		 * See this page for more info about buttons
-		 * https://docs.geode-sdk.org/tutorials/buttons
-		*/
-{%- endif %}
-		auto myButton = CCMenuItemSpriteExtra::create(
-			CCSprite::createWithSpriteFrameName("GJ_likeBtn_001.png"),
-			this,
-{%- if comments %}
-			/**
-			 * Here we use the name we set earlier for our modify class.
-			*/
-{%- endif %}
-			menu_selector(MyMenuLayer::onMyButton)
-		);
-{% if comments %}
-		/**
-		 * Here we access the `bottom-menu` node by its ID, and add our button to it.
-		 * Node IDs are a Geode feature, see this page for more info about it:
-		 * https://docs.geode-sdk.org/tutorials/nodetree
-		*/
-{%- endif %}
-		auto menu = this->getChildByID("bottom-menu");
-		menu->addChild(myButton);
-{% if comments %}
-		/**
-		 * The `_spr` string literal operator just prefixes the string with
-		 * your mod id followed by a slash. This is good practice for setting your own node ids.
-		*/
-{%- endif %}
-		myButton->setID("my-button"_spr);
-{% if comments %}
-		/**
-		 * We update the layout of the menu to ensure that our button is properly placed.
-		 * This is yet another Geode feature, see this page for more info about it:
-		 * https://docs.geode-sdk.org/tutorials/layouts
-		*/
-{%- endif %}
-		menu->updateLayout();
-{% if comments %}
-		/**
-		 * We return `true` to indicate that the class was properly initialized.
-		 */
-{%- endif %}
-		return true;
-	}
-{% if comments %}
-	/**
-	 * This is the callback function for the button we created earlier.
-	 * The signature for button callbacks must always be the same,
-	 * return type `void` and taking a `CCObject*`.
-	*/
-{%- endif %}
-	void onMyButton(CCObject*) {
-		FLAlertLayer::create("Geode", "Hello from my custom mod!", "OK")->show();
-	}
+
+// Modificamos la pantalla de información del nivel (donde se ven las estadísticas y comentarios)
+class $modify(MyLevelInfoLayer, LevelInfoLayer) {
+    bool init(GJGameLevel* level, bool isGauntlet) {
+        if (!LevelInfoLayer::init(level, isGauntlet)) return false;
+
+        // Buscamos el menú izquierdo donde suelen estar los botones adicionales
+        auto leftMenu = this->getChildByID("left-sidebar-menu");
+        if (!leftMenu) return true; // Si no existe por alguna razón, evitamos que el juego crasheé
+
+        // Creamos el sprite visual del botón usando un icono de flecha verde del juego
+        auto btnSprite = CircleButtonSprite::createWithSpriteFrameName("GJ_arrow02_001.png");
+        
+        // Creamos el botón interactivo y le asignamos la función al tocarlo
+        auto requestBtn = CCMenuItemSpriteExtra::create(
+            btnSprite,
+            this,
+            menu_selector(MyLevelInfoLayer::onSendRequest)
+        );
+
+        // Le asignamos una ID única a nuestro botón para mantener el orden
+        requestBtn->setID("gdps-request-button"_spr);
+
+        // Guardamos de forma temporal la ID del nivel dentro del botón usando un Tag
+        requestBtn->setTag(level->m_levelID.value());
+
+        // Añadimos el botón al menú lateral
+        leftMenu->addChild(requestBtn);
+        
+        // Le decimos a Geode que reorganice los botones automáticamente para que no se encimen
+        leftMenu->updateLayout();
+
+        return true;
+    }
+
+    // Esta es la función que se ejecuta al presionar el botón
+    void onSendRequest(CCObject* sender) {
+        auto btn = static_cast<CCMenuItemSpriteExtra*>(sender);
+        int levelID = btn->getTag(); // Recuperamos la ID del nivel que guardamos en el Tag
+
+        // Creamos un texto personalizado con la ID
+        std::string mensaje = "¡Hola! Aquí enviaremos el nivel " + std::to_string(levelID) + " a Discord en la Fase 3.";
+
+        // Mostramos una alerta en pantalla dentro del juego
+        FLAlertLayer::create("Level Request", mensaje.c_str(), "OK")->show();
+    }
 };
